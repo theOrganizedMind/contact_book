@@ -1,6 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
-from tkinter.scrolledtext import ScrolledText
+from tkinter import messagebox, ttk
 import json
 import os
 
@@ -17,6 +16,66 @@ import os
 
 
 CONTACTS_DATA = "./contacts.json"
+
+
+# Load data from file
+def load_data(file_path):
+    """
+    Load data from a JSON file.
+
+    This function checks if the specified JSON file exists. If it does, it 
+    reads the file and returns the data as a list. If the file does not 
+    exist, it returns an empty list.
+
+    Parameters:
+    file_path (str): The path to the JSON file.
+
+    Returns:
+    list: The data loaded from the JSON file, or an empty list if the file 
+    does not exist.
+    """
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            return json.load(file)
+    return []
+
+
+# Save data to file
+def save_data(data, file_path):
+    """
+    Save data to a JSON file.
+
+    This function writes the specified data to a JSON file at the specified 
+    file path.
+
+    Parameters:
+    data (list): The data to be saved to the JSON file.
+    file_path (str): The path to the JSON file.
+
+    Returns:
+    None
+    """
+    with open(file_path, 'w') as file:
+        json.dump(data, file, indent=4)
+
+
+def clear_fields():
+    """
+    Clear the input fields.
+
+    This function clears the values in the company, client, phone, and email 
+    entry widgets.
+
+    Parameters:
+    None
+
+    Returns:
+    None
+    """
+    combo_company.set('')
+    entry_client.delete(0, tk.END)
+    entry_phone.delete(0, tk.END)
+    entry_email.delete(0, tk.END)
 
 
 def add_contact():
@@ -37,7 +96,7 @@ def add_contact():
     Returns:
     None
     """
-    company = entry_company.get()
+    company = combo_company.get()
     client = entry_client.get()
     phone = entry_phone.get()
     email = entry_email.get()
@@ -50,103 +109,85 @@ def add_contact():
             "email": email if email else "N/A",
         }
 
-        if os.path.exists(CONTACTS_DATA):
-            with open(CONTACTS_DATA, 'r') as file:
-                contacts = json.load(file)
-        else:
-            contacts = []
-
+        contacts = load_data(CONTACTS_DATA)
         contacts.append(new_contact)
-
-        with open(CONTACTS_DATA, 'w') as file:
-            json.dump(contacts, file, indent=4)
+        save_data(contacts, CONTACTS_DATA)
 
         messagebox.showinfo("Success", "Contact added successfully!")
-        entry_company.delete(0, tk.END)
-        entry_client.delete(0, tk.END)
-        entry_phone.delete(0, tk.END)
-        entry_email.delete(0, tk.END)
-    
+        clear_fields()
+        update_contact_list()
+        update_company_list()
     else:
         messagebox.showwarning("Input Error", 
                                "Client name and phone number are required!")
+        
 
-
-def show_results(results):
+def update_contact():
     """
-    Display the search results in a new Tkinter window.
+    Update an existing contact in the contact book.
 
-    This function creates a new top-level window to display the search 
-    results. It uses a ScrolledText widget to show the details of each 
-    contact found in the search. Each contact's company name, client name, 
-    phone number, and email address are displayed in the ScrolledText 
-    widget.
+    This function retrieves the selected contact from the contact list, 
+    updates its details with the values from the Tkinter entry widgets, 
+    and saves the updated contacts list to the JSON file. After 
+    successfully updating the contact, it clears the entry fields and 
+    shows a success message. If no contact is selected, it shows a warning 
+    message.
 
     Parameters:
-    results (list): A list of dictionaries, where each dictionary contains 
-                    the details of a contact (company, client, phone, email).
+    None
 
     Returns:
     None
     """
-
-    def save_changes():
-        """
-        Save the updated contact information from the ScrolledText widget.
-
-        This function retrieves the updated contact information from the 
-        ScrolledText widget, parses it, and updates the contacts list stored 
-        in the JSON file. It then saves the updated contacts list back to the 
-        JSON file and displays a success message. The function also closes the 
-        search results window after saving the changes.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-        """
-        updated_text = result_text.get("1.0", tk.END).strip()
-        updated_contacts = []
-        for contact_text in updated_text.split("\n\n"):
-            lines = contact_text.split("\n")
-            if len(lines) == 4:
-                company = lines[0].split(": ")[1]
-                client = lines[1].split(": ")[1]
-                phone = lines[2].split(": ")[1]
-                email = lines[3].split(": ")[1]
-                updated_contacts.append({
-                    "company": company,
-                    "client": client,
-                    "phone": phone,
-                    "email": email
-                })
+    selected_item = contact_list.selection()
+    if selected_item:
+        item_index = int(selected_item[0])
+        contacts = load_data(CONTACTS_DATA)
         
-        with open(CONTACTS_DATA, 'w') as file:
-            json.dump(updated_contacts, file, indent=4)
+        contacts[item_index] = {
+            "company": combo_company.get() if combo_company.get() else "N/A",
+            "client": entry_client.get(),
+            "phone": entry_phone.get(),
+            "email": entry_email.get() if entry_email.get() else "N/A",
+        }
         
-        messagebox.showinfo("Success", "Changes saved successfully!")
-        result_window.destroy()
+        save_data(contacts, CONTACTS_DATA)
+        messagebox.showinfo("Success", "Contact updated successfully!")
+        clear_fields()
+        update_contact_list()
+        update_company_list()
+    else:
+        messagebox.showwarning("Selection Error", "No contact selected!")
 
-    result_window = tk.Toplevel(root)
-    result_window.title("Search Results")
-    result_window.geometry("400x500")
 
-    result_text = ScrolledText(result_window, wrap=tk.WORD, font=("Helvetica", 12))
-    result_text.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+def remove_contact():
+    """
+    Remove a contact from the contact book.
 
-    for contact in results:
-        result_text.insert(tk.END, f"Company: {contact['company']}\n")
-        result_text.insert(tk.END, f"Client: {contact['client']}\n")
-        result_text.insert(tk.END, f"Phone: {contact['phone']}\n")
-        result_text.insert(tk.END, f"Email: {contact['email']}\n")
-        result_text.insert(tk.END, "\n")
+    This function retrieves the selected contact from the contact list, 
+    removes it from the contacts list, and saves the updated contacts list 
+    to the JSON file. After successfully removing the contact, it clears 
+    the entry fields and shows a success message. If no contact is 
+    selected, it shows a warning message.
 
-    result_text.config(state=tk.NORMAL)
+    Parameters:
+    None
 
-    save_button = tk.Button(result_window, text="Save Changes", 
-                            command=save_changes)
-    save_button.pack(side=tk.RIGHT, padx=10, pady=10)
+    Returns:
+    None
+    """
+    selected_item = contact_list.selection()
+    if selected_item:
+        item_index = int(selected_item[0])
+        contacts = load_data(CONTACTS_DATA)
+        del contacts[item_index]
+        save_data(contacts, CONTACTS_DATA)
+        messagebox.showinfo("Success", "Contact removed successfully!")
+        clear_fields()
+        update_contact_list()
+        update_company_list()
+    else:
+        messagebox.showwarning("Selection Error", "No contact selected!")
 
 
 def search_contact():
@@ -166,30 +207,105 @@ def search_contact():
     Returns:
     None
     """
-    search_term = entry_search.get()
+    company = combo_company.get()
+    client = entry_client.get()
 
-    if not search_term:
-        messagebox.showwarning("Input Error", "Search field is required!")
+    if not company and not client:
+        messagebox.showwarning("Input Error", 
+                               "Please enter a company name or client name to search.")
         return
 
-    if os.path.exists(CONTACTS_DATA):
-        with open(CONTACTS_DATA, 'r') as file:
-            contacts = json.load(file)
+    contacts = load_data(CONTACTS_DATA)
+    results = [contact for contact in contacts if (company.lower() in contact['company'].lower() \
+            if company else True) and (client.lower() in contact['client'].lower() if client else True)]
+    update_contact_list(results)
 
-        results = [
-                    contact for contact in contacts 
-                   if (search_term.lower() in contact['company'].lower() or 
-                       search_term.lower() in contact['client'].lower())
-                    ]
 
-        if results:
-            show_results(results)
-        else:
-            messagebox.showinfo("No Results", "No contacts found.")
-    else:
-        messagebox.showinfo("No Contacts", "No contacts available to search.")
+def clear_results():
+    """
+    Clear the search results and display the complete list of contacts.
 
-    entry_search.delete(0, tk.END)
+    This function clears the search results and displays the complete list 
+    of contacts in the contact list.
+
+    Parameters:
+    None
+
+    Returns:
+    None
+    """
+    update_contact_list()
+    clear_fields()
+
+
+# Handle double-click event on contact list
+def on_item_double_click(event):
+    """
+    Handle the double-click event on the contact list.
+
+    This function retrieves the selected contact from the contact list and 
+    populates the Tkinter entry widgets with the contact's details.
+
+    Parameters:
+    event (Event): The event object representing the double-click event.
+
+    Returns:
+    None
+    """
+    selected_item = contact_list.selection()
+    if selected_item:
+        item_index = int(selected_item[0])
+        contacts = load_data(CONTACTS_DATA)
+        contact = contacts[item_index]
+        combo_company.set(contact["company"])
+        entry_client.delete(0, tk.END)
+        entry_client.insert(0, contact["client"])
+        entry_phone.delete(0, tk.END)
+        entry_phone.insert(0, contact["phone"])
+        entry_email.delete(0, tk.END)
+        entry_email.insert(0, contact["email"])
+
+
+def update_contact_list(filtered_contacts=None):
+    """
+    Update the contact list display.
+
+    This function updates the contact list display with the contacts from 
+    the JSON file. If a filtered contacts list is provided, it displays 
+    the filtered contacts instead.
+
+    Parameters:
+    filtered_contacts (list, optional): A list of filtered contacts to be 
+    displayed. Defaults to None.
+
+    Returns:
+    None
+    """
+    contacts = load_data(CONTACTS_DATA) if filtered_contacts is None else filtered_contacts
+    contact_list.delete(*contact_list.get_children())
+    for index, contact in enumerate(contacts):
+        contact_list.insert("", "end", iid=index, values=(contact["company"], 
+                            contact["client"], contact["phone"], contact["email"]))
+
+
+def update_company_list():
+    """
+    Update the company list in the company combobox.
+
+    This function updates the company list in the company combobox with 
+    the unique company names from the contacts list.
+
+    Parameters:
+    None
+
+    Returns:
+    None
+    """
+    contacts = load_data(CONTACTS_DATA)
+    companies = sorted(set(contact["company"] for contact in contacts \
+                           if contact["company"] != "N/A"))
+    combo_company["values"] = companies
+
 
 # ========================================================================== #
 # ================================ GUI ===================================== #
@@ -200,8 +316,8 @@ root.config(padx=25, pady=25)
 
 # Labels and entry fields for contact information
 tk.Label(root, text="Company Name:").grid(row=0, column=0, padx=10, pady=5)
-entry_company = tk.Entry(root, width=30)
-entry_company.grid(row=0, column=1, padx=10, pady=5)
+combo_company = ttk.Combobox(root, width=27)
+combo_company.grid(row=0, column=1, padx=10, pady=5)
 
 tk.Label(root, text="*Client Name:").grid(row=1, column=0, padx=10, pady=5)
 entry_client = tk.Entry(root, width=30)
@@ -215,14 +331,34 @@ tk.Label(root, text="Email:").grid(row=3, column=0, padx=10, pady=5)
 entry_email = tk.Entry(root, width=30)
 entry_email.grid(row=3, column=1, padx=10, pady=5)
 
-# Buttons to add and search  contacts
-tk.Button(root, text="Add Contact", command=add_contact).grid(row=4, 
-                                    column=1, columnspan=2, pady=10)
-tk.Label(root, text="Search:").grid(row=5, column=0, padx=10, pady=5)
-entry_search = tk.Entry(root, width=30)
-entry_search.grid(row=5, column=1, padx=10, pady=5)
-tk.Button(root, text="Search Contacts", command=search_contact).grid(row=6, 
-                                        column=1, columnspan=2, pady=10)
+# Buttons to add, update, and search contacts
+tk.Button(root, width=15, text="Add Contact", 
+          command=add_contact).grid(row=0, column=2, pady=5)
+tk.Button(root, width=15, text="Update Contact", 
+          command=update_contact).grid(row=1, column=2, pady=5)
+tk.Button(root, width=15, text="Remove Contact", 
+          command=remove_contact).grid(row=2, column=2, pady=5)
 
+tk.Button(root, width=15, text="Search Contacts", 
+          command=search_contact).grid(row=3, 
+                                        column=2, pady=5)
+tk.Button(root, width=15, text="Clear Results", 
+          command=clear_results).grid(row=6, column=2, pady=10)
+
+# Create contact list display
+contact_list = ttk.Treeview(root, columns=("Company Name", "Client Name", 
+                                           "Phone Number", "Email"), show="headings")
+contact_list.heading("Company Name", text="Company Name")
+contact_list.heading("Client Name", text="Client Name")
+contact_list.heading("Phone Number", text="Phone Number")
+contact_list.heading("Email", text="Email")
+contact_list.grid(row=7, column=0, columnspan=3, padx=10, pady=10, sticky="nsew")
+
+# Bind double-click event to inventory list
+contact_list.bind("<Double-1>", on_item_double_click)
+
+# Update contact list display on startup
+update_contact_list()
+update_company_list()
 
 root.mainloop()
